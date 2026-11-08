@@ -13,6 +13,9 @@
 
 ---
 
+
+> **Sobre este repositorio.** Se creó exclusivamente para hacer visible la investigación y la implementación del proyecto de tesis. El repositorio de desarrollo original es privado, está en producción y contiene elementos ajenos a la investigación; la evidencia de sus 222 commits hasta la versión evaluada está en [HISTORIAL_COMMITS.md](HISTORIAL_COMMITS.md). La versión evaluada corresponde a la etiqueta `ep2-v1.0`.
+
 ## 📋 Tabla de Contenidos
 
 1. [Visión General](#-visión-general)
