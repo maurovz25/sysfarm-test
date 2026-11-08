@@ -1,0 +1,240 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum TipoProducto {
+  MEDICAMENTO
+  DISPOSITIVO_MEDICO
+}
+
+enum Role {
+  ADMIN        @map("admin")
+  FARMACEUTICO @map("farmaceutico")
+  VENDEDOR     @map("vendedor")
+  SOLICITANTE  @map("solicitante")
+  AUDITOR      @map("auditor")
+}
+
+model Product {
+  id                String         @id @default(uuid())
+  nombre            String
+  codigoBarras      String?        @unique
+  descripcion       String?
+  tipo              TipoProducto
+  registroSanitario String?
+  presentacion      String?
+  unidadBase        String?
+  stockMinimo       Int            @default(0)
+  deletedAt         DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  batches           Batch[]
+  movements         Movement[]
+  audits            ProductAudit[]
+  requerimientoItems RequerimientoItem[]
+  plantillaItems      PlantillaRequerimientoItem[]
+
+  @@index([nombre])
+  @@index([tipo])
+  @@index([deletedAt])
+  @@index([deletedAt, nombre])
+}
+
+model ProductAudit {
+  id            String   @id @default(uuid())
+  productId     String
+  productName   String
+  campoEditado  String
+  valorAnterior String?
+  valorNuevo    String?
+  usuario       String
+  fecha         DateTime @default(now())
+  product       Product  @relation(fields: [productId], references: [id])
+
+  @@index([productId])
+  @@index([fecha])
+}
+
+model Batch {
+  id                      String     @id @default(uuid())
+  codigo                  String
+  fechaExpiracion         DateTime
+  stockActual             Int        @default(0)
+  cantidadPorPresentacion Int        @default(1)
+  precioCostoPresentacion Float      @default(0)
+  precioVentaPresentacion Float      @default(0)
+  laboratorio             String?
+  deletedAt               DateTime?
+  productId               String
+  createdAt               DateTime   @default(now())
+  updatedAt               DateTime   @updatedAt
+  product                 Product    @relation(fields: [productId], references: [id])
+  movements               Movement[]
+  requerimientoItems      RequerimientoItem[]
+
+  @@index([codigo])
+  @@index([productId, deletedAt])
+  @@index([productId, deletedAt, fechaExpiracion])
+}
+
+model Movement {
+  id           String      @id @default(uuid())
+  tipo         String
+  cantidad     Int
+  fecha        DateTime    @default(now())
+  motivo       String?
+  usuario      String?
+  departamento String?
+  solicitante  String?
+  proveedor    String?
+  productId    String
+  batchId      String?
+  batch        Batch?      @relation(fields: [batchId], references: [id])
+  product      Product     @relation(fields: [productId], references: [id])
+  guiasSalida  GuiaSalida[]
+
+  @@index([fecha])
+  @@index([tipo, fecha])
+  @@index([productId, fecha])
+  @@index([batchId])
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  nombre    String?
+  role      String   
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Requerimiento {
+  id            String              @id @default(uuid())
+  codigo        String              @unique
+  solicitante   String
+  departamento  String
+  estado        String              @default("PENDIENTE") // PENDIENTE, DESPACHADO, RECHAZADO, CANCELADO
+  observaciones String?
+  atendidoPor   String?
+  motivoRechazo String?
+  fechaAtencion DateTime?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  items         RequerimientoItem[]
+
+  @@index([estado])
+  @@index([departamento])
+  @@index([createdAt])
+  @@index([estado, createdAt])
+}
+
+model RequerimientoItem {
+  id                 String        @id @default(uuid())
+  requerimientoId    String
+  productId          String
+  batchId            String?
+  cantidadSolicitada Int
+  cantidadAprobada   Int?
+  tipoUnidad         String        @default("unidad")
+  observacion        String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  requerimiento      Requerimiento @relation(fields: [requerimientoId], references: [id], onDelete: Cascade)
+  product            Product       @relation(fields: [productId], references: [id])
+  batch              Batch?        @relation(fields: [batchId], references: [id])
+
+  @@index([requerimientoId])
+  @@index([productId])
+  @@index([batchId])
+}
+
+model PlantillaRequerimiento {
+  id          String                       @id @default(uuid())
+  nombre      String
+  descripcion String?
+  areaId      String?
+  area        Area?                        @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  createdAt   DateTime                     @default(now())
+  updatedAt   DateTime                     @updatedAt
+  items       PlantillaRequerimientoItem[]
+
+  @@index([areaId])
+}
+
+model PlantillaRequerimientoItem {
+  id          String                 @id @default(uuid())
+  plantillaId String
+  productId   String
+  orden       Int                    @default(0)
+  plantilla   PlantillaRequerimiento @relation(fields: [plantillaId], references: [id], onDelete: Cascade)
+  product     Product                @relation(fields: [productId], references: [id])
+
+  @@index([plantillaId])
+  @@index([productId])
+}
+
+model Area {
+  id          String                   @id @default(uuid())
+  nombre      String                   @unique
+  descripcion String?
+  activo      Boolean                  @default(true)
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+  plantillas  PlantillaRequerimiento[]
+
+  @@index([nombre])
+  @@index([activo])
+}
+
+model GuiaSalida {
+  id                  String    @id @default(uuid())
+  codigo              String    @unique // Formato: GS-1, GS-2, etc.
+  correlativo         Int       @unique // Número secuencial para cálculo atómico
+  
+  // Datos Médicos y Paciente
+  medicoAnestesiologo String    // Nombre del médico anestesiólogo
+  cmpMedico           String?   // Número de Colegiatura Médica (CMP)
+  paciente            String    // Nombre del paciente
+  dniPaciente         String?   // Número de DNI del paciente
+  direccionPaciente   String?   // Dirección domiciliaria del paciente
+  distritoPaciente    String?   // Distrito del paciente
+  numeroReceta        String    // Número de referencia de receta médica / especial
+  
+  // Fechas
+  fechaSalida         DateTime  // Fecha de salida del medicamento (del movimiento)
+  fechaEmision        DateTime  @default(now()) // Fecha de emisión de la guía
+  
+  // Snapshot de Integridad del Medicamento
+  medicamentoNombre   String    // Nombre del producto al momento de emitir
+  loteCodigo          String?   // Lote físico despachado
+  fechaVencimiento    DateTime? // Vencimiento del lote
+  cantidad            Int       // Cantidad entregada en unidades
+  unidadMedida        String?   // Presentación o unidad base
+  
+  // Auditoría y Relación
+  usuarioEmisor       String?   // Usuario que emitió la guía
+  movementId          String
+  movement            Movement  @relation(fields: [movementId], references: [id], onDelete: Cascade)
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([medicoAnestesiologo])
+  @@index([paciente])
+  @@index([dniPaciente])
+  @@index([numeroReceta])
+  @@index([codigo])
+  @@index([movementId])
+  @@index([fechaSalida])
+  @@index([fechaEmision])
+}
+
+
+

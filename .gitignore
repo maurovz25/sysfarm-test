@@ -1,0 +1,24 @@
+# Documentation
+docs/*
+.agents/*
+
+# Secretos y entorno
+.env
+.env.*
+!.env.example
+
+# Dependencias y compilación
+node_modules/
+dist/
+.next/
+
+# Respaldos de la base de datos y scripts de mantenimiento (pueden contener datos reales)
+backups/
+backend/scripts/
+*.dump
+
+# Credenciales del kit de pruebas de humo
+smoke.env
+
+# Registros
+*.log
