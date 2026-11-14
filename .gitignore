@@ -22,3 +22,7 @@ smoke.env
 
 # Registros
 *.log
+
+# Salidas del modelo de pronóstico (derivadas de datos de la clínica, no se publican)
+ml/out/
+ml/__pycache__/
