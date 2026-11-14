@@ -81,20 +81,27 @@ def _metricas(e, y):
             'RMSE': float(np.sqrt((e ** 2).mean()))}
 
 
-def evaluar(D, es_med, origenes_prueba, origen_min):
-    """Validación con origen móvil: para cada origen de prueba se entrena solo con ventanas cuyo objetivo ya terminó."""
+def errores(D, es_med, origenes_prueba, origen_min, entrenar_con=None):
+    """Errores (predicción − real) por producto y origen de prueba para los cuatro métodos, y la demanda real.
+    entrenar_con: máscara opcional de productos usados para entrenar (validación cruzada por productos)."""
     E = {'regresion': [], 'regresion_relativa_robusta': [], 'ultima_semana': [], 'promedio_4_semanas': []}; Y = []
     for t in origenes_prueba:
         entren = list(range(origen_min, t - H + 1))
-        X, y, _ = ventanas(D, entren, es_med)
+        X, y, p = ventanas(D, entren, es_med)
+        if entrenar_con is not None: X, y = X[entrenar_con[p]], y[entrenar_con[p]]
         Xt, yt, _ = ventanas(D, [t], es_med)
         E['regresion'].append(predecir(ajustar(X, y), Xt) - yt)
         E['regresion_relativa_robusta'].append(predecir_relativo(ajustar_relativo(X, y), Xt) - yt)
         E['ultima_semana'].append(Xt[:, 1] - yt)
         E['promedio_4_semanas'].append(Xt[:, 2] - yt)
         Y.append(yt)
-    Y = np.concatenate(Y)
-    return {k: _metricas(np.concatenate(v), Y) for k, v in E.items()}
+    return {k: np.vstack(v) for k, v in E.items()}, np.vstack(Y)  # matrices orígenes × productos
+
+
+def evaluar(D, es_med, origenes_prueba, origen_min):
+    """Validación con origen móvil: para cada origen de prueba se entrena solo con ventanas cuyo objetivo ya terminó."""
+    E, Y = errores(D, es_med, origenes_prueba, origen_min)
+    return {k: _metricas(v.ravel(), Y.ravel()) for k, v in E.items()}
 
 
 def reposicion(pred7, sigma7, stock, L=3, R=7, z=1.65):
@@ -112,3 +119,17 @@ def riesgo_vencimiento(lotes, demanda_diaria, hoy):
         consumido += consumible
         out.append((lote, consumible, stock - consumible))
     return out
+
+
+def wilcoxon_unilateral(a, b):
+    """Prueba de rangos con signo de Wilcoxon (aproximación normal con corrección por empates) de H1: a > b.
+    Devuelve (n sin empates en cero, W+, z, p unilateral)."""
+    d = np.asarray(a, float) - np.asarray(b, float); d = d[d != 0]; n = len(d)
+    if n == 0: return 0, 0.0, 0.0, 1.0
+    ab = np.abs(d); orden = ab.argsort(); r = np.empty(n); r[orden] = np.arange(1, n + 1)
+    _, inv, cnt = np.unique(ab, return_inverse=True, return_counts=True)
+    r = np.array([r[inv == g].mean() for g in range(len(cnt))])[inv]  # rangos promedio en empates
+    w = r[d > 0].sum(); mu = n * (n + 1) / 4
+    var = n * (n + 1) * (2 * n + 1) / 24 - (cnt ** 3 - cnt).sum() / 48
+    z = (w - mu) / math.sqrt(var)
+    return n, float(w), float(z), 0.5 * math.erfc(z / math.sqrt(2))
