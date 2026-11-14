@@ -106,7 +106,7 @@ fig, ax = plt.subplots(figsize=(6.4, 3.2))
 k = ['regresion', 'regresion_relativa_robusta', 'ultima_semana', 'promedio_4_semanas']; etiquetas = ['Regresión\nlineal', 'Regresión relativa\nrobusta', 'Última\nsemana', 'Promedio\n4 semanas']
 ax.bar(etiquetas, [metricas[x]['MAE'] for x in k], color=['#9db7d5', '#1f4e79', '#c9c9c9', '#c9c9c9'])
 for j, x in enumerate(k): ax.text(j, metricas[x]['MAE'], f"{metricas[x]['MAE']:.2f}".replace('.', ','), ha='center', va='bottom')
-ax.set_ylabel('Error absoluto medio (unidades en 7 días)'); ax.spines[['top', 'right']].set_visible(False); fig.tight_layout()
+ax.set_ylabel('MAE (unidades en 7 días)'); ax.spines[['top', 'right']].set_visible(False); fig.tight_layout()
 fig.savefig(os.path.join(OUT, 'fig_errores.png'), dpi=200)
 print(json.dumps({k: salida[k] for k in ('productos', 'salidas_ventana', 'coeficientes', 'r2_entrenamiento', 'metricas_prueba', 'modelo_elegido', 'reposicion', 'riesgo')}, ensure_ascii=False, indent=1))
 print(json.dumps(caso, ensure_ascii=False)[:1500])
