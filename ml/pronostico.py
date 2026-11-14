@@ -50,18 +50,46 @@ def predecir(beta, X):
     return np.clip(X @ beta, 0, None)
 
 
+def ajustar_lad(X, y, iteraciones=100):
+    """Regresión de mínimas desviaciones absolutas (mediana condicional) por mínimos cuadrados reponderados.
+    Minimiza el mismo error que se evalúa (MAE) y no se deja arrastrar por picos de demanda."""
+    b = ajustar(X, y)
+    for _ in range(iteraciones):
+        w = np.sqrt(1 / np.maximum(np.abs(y - X @ b), 1e-3))
+        b = np.linalg.lstsq(X * w[:, None], y * w, rcond=None)[0]
+    return b
+
+
+def _escala(X):
+    """Escala de cada fila: promedio semanal de 28 días + 1 (los productos difieren hasta 1000 veces en volumen)."""
+    return X[:, 2] + 1
+
+
+def ajustar_relativo(X, y):
+    """Regresión robusta sobre la demanda relativa: y/s ~ X/s, para que cada producto pese por su patrón y no por su volumen."""
+    s = _escala(X)
+    return ajustar_lad(X / s[:, None], y / s)
+
+
+def predecir_relativo(beta, X):
+    s = _escala(X)
+    return np.clip((X / s[:, None]) @ beta * s, 0, None)
+
+
 def _metricas(e, y):
-    return {'MAE': float(np.abs(e).mean()), 'WAPE': float(np.abs(e).sum() / y.sum()) if y.sum() else None}
+    return {'MAE': float(np.abs(e).mean()), 'WAPE': float(np.abs(e).sum() / y.sum()) if y.sum() else None,
+            'RMSE': float(np.sqrt((e ** 2).mean()))}
 
 
 def evaluar(D, es_med, origenes_prueba, origen_min):
     """Validación con origen móvil: para cada origen de prueba se entrena solo con ventanas cuyo objetivo ya terminó."""
-    E = {'regresion': [], 'ultima_semana': [], 'promedio_4_semanas': []}; Y = []
+    E = {'regresion': [], 'regresion_relativa_robusta': [], 'ultima_semana': [], 'promedio_4_semanas': []}; Y = []
     for t in origenes_prueba:
         entren = list(range(origen_min, t - H + 1))
-        beta = ajustar(*ventanas(D, entren, es_med)[:2])
+        X, y, _ = ventanas(D, entren, es_med)
         Xt, yt, _ = ventanas(D, [t], es_med)
-        E['regresion'].append(predecir(beta, Xt) - yt)
+        E['regresion'].append(predecir(ajustar(X, y), Xt) - yt)
+        E['regresion_relativa_robusta'].append(predecir_relativo(ajustar_relativo(X, y), Xt) - yt)
         E['ultima_semana'].append(Xt[:, 1] - yt)
         E['promedio_4_semanas'].append(Xt[:, 2] - yt)
         Y.append(yt)

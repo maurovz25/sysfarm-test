@@ -1,7 +1,7 @@
 import unittest
 from datetime import date
 import numpy as np
-from pronostico import serie_diaria, ventanas, ajustar, predecir, reposicion, riesgo_vencimiento, evaluar
+from pronostico import serie_diaria, ventanas, ajustar, predecir, reposicion, riesgo_vencimiento, evaluar, ajustar_lad, ajustar_relativo, predecir_relativo
 
 
 class TestPronostico(unittest.TestCase):
@@ -23,6 +23,17 @@ class TestPronostico(unittest.TestCase):
         beta = np.array([2.0, 0.5, -1.0]); b = ajustar(X, X @ beta)
         np.testing.assert_allclose(b, beta, atol=1e-9)
 
+    def test_lad_ignora_valores_atipicos(self):
+        X = np.c_[np.ones(21), np.arange(21.0)]; y = 2 + 3 * np.arange(21.0); y[[5, 15]] += 500  # dos picos
+        np.testing.assert_allclose(ajustar_lad(X, y), [2.0, 3.0], atol=1e-2)
+        self.assertGreater(abs(ajustar(X, y)[0] - 2.0), 5)  # mínimos cuadrados sí se desvía
+
+    def test_modelo_relativo_escala_con_el_producto(self):
+        # mismo patrón relativo en un producto pequeño y uno grande: la predicción escala con su promedio
+        X = np.array([[1, 7, 7, 0.5, 1], [1, 700, 700, 0.5, 1]], float); y = np.array([7.0, 700.0])
+        b = ajustar_relativo(np.vstack([X] * 5), np.r_[y, y, y, y, y])
+        np.testing.assert_allclose(predecir_relativo(b, X), [7.0, 700.0], rtol=0.15)
+
     def test_prediccion_no_negativa(self):
         self.assertTrue((predecir(np.array([-5.0, 1.0]), np.array([[1.0, 0.0], [1.0, 2.0]])) >= 0).all())
 
@@ -42,7 +53,7 @@ class TestPronostico(unittest.TestCase):
     def test_evaluar_devuelve_metricas_de_las_tres_politicas(self):
         rng = np.random.default_rng(1); D = rng.poisson(1.0, size=(30, 70)).astype(float)
         m = evaluar(D, np.ones(30), list(range(56, 63)), 28)
-        for k in ('regresion', 'ultima_semana', 'promedio_4_semanas'):
+        for k in ('regresion', 'regresion_relativa_robusta', 'ultima_semana', 'promedio_4_semanas'):
             self.assertIn('MAE', m[k]); self.assertIn('WAPE', m[k])
 
 
