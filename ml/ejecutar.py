@@ -10,8 +10,8 @@ from pronostico import cargar_salidas, serie_diaria, ventanas, ajustar, predecir
 
 RAW = sys.argv[1]
 NOMBRES = sys.argv[2] if len(sys.argv) > 2 else None
-OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'out'); os.makedirs(OUT, exist_ok=True)
-INICIO, FIN = date(2026, 8, 26), date(2026, 10, 14)  # ventana de operación continua hasta la exportación
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'out' + ('' if 'FIN' not in os.environ else '_' + os.environ['FIN'])); os.makedirs(OUT, exist_ok=True)
+INICIO, FIN = date(2026, 8, 26), date.fromisoformat(os.environ.get('FIN', '2026-10-14'))  # FIN: último día completo de la exportación
 HOY = FIN
 VENTANA_ALERTA = 90  # días; mismo umbral de la alerta de vencimiento del dashboard de SysFarm
 

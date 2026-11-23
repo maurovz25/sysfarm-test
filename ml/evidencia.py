@@ -12,8 +12,8 @@ from datetime import date
 import numpy as np
 from pronostico import cargar_salidas, serie_diaria, errores, wilcoxon_unilateral, HIST, H
 
-RAW = sys.argv[1]; OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'out'); os.makedirs(OUT, exist_ok=True)
-INICIO, FIN = date(2026, 8, 26), date(2026, 10, 14)
+RAW = sys.argv[1]; OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'out' + ('' if 'FIN' not in os.environ else '_' + os.environ['FIN'])); os.makedirs(OUT, exist_ok=True)
+INICIO, FIN = date(2026, 8, 26), date.fromisoformat(os.environ.get('FIN', '2026-10-14'))  # FIN: último día completo de la exportación
 sal = cargar_salidas(os.path.join(RAW, 'movimientos.csv'))
 with open(os.path.join(RAW, 'lotes.csv'), encoding='utf-8') as f:
     tipo = {r['producto_id']: r['tipo'] for r in csv.DictReader(f) if r['eliminado'] == 'false'}
