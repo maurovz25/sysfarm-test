@@ -3,6 +3,7 @@ import prisma from '../prisma';
 import { z } from 'zod';
 import { invalidateDashboardCache } from './dashboard.controller';
 import { InsufficientFefoStockError, planFefoAllocation } from '../utils/fefo';
+import { descontarLote, RequerimientoYaAtendidoError, reservarRequerimiento } from '../utils/despacho';
 
 const createRequerimientoItemSchema = z.object({
   productId: z.string(),
@@ -348,6 +349,8 @@ export const aprobarYDespacharRequerimiento = async (req: Request, res: Response
 
     // Ejecutar transacción Prisma para despacho FEFO
     const result = await prisma.$transaction(async (tx) => {
+      // R-01: se reserva el requerimiento antes de tocar stock; un segundo despacho simultáneo falla aquí
+      await reservarRequerimiento(tx, id, (req as any).user.full_name);
       const itemsToProcess = [...requerimiento.items];
 
       // Procesar si hay ítems nuevos agregados en el despacho (tienen productId pero no itemId existente)
@@ -412,12 +415,7 @@ export const aprobarYDespacharRequerimiento = async (req: Request, res: Response
 
         for (const { batch, quantity: amountFromBatch } of allocations) {
           // Descontar del lote
-          await tx.batch.update({
-            where: { id: batch.id },
-            data: {
-              stockActual: { decrement: amountFromBatch },
-            },
-          });
+          await descontarLote(tx, batch.id, amountFromBatch);
 
           // Registrar Movimiento de Salida en inventario/kardex
           await tx.movement.create({
@@ -435,14 +433,9 @@ export const aprobarYDespacharRequerimiento = async (req: Request, res: Response
         }
       }
 
-      // Actualizar estado del requerimiento
-      const updatedReq = await tx.requerimiento.update({
+      // El estado ya se actualizó al reservar; se devuelve el requerimiento con sus ítems
+      const updatedReq = await tx.requerimiento.findUniqueOrThrow({
         where: { id },
-        data: {
-          estado: 'DESPACHADO',
-          atendidoPor: (req as any).user.full_name,
-          fechaAtencion: new Date(),
-        },
         include: {
           items: {
             include: {
@@ -464,6 +457,10 @@ export const aprobarYDespacharRequerimiento = async (req: Request, res: Response
   } catch (error: any) {
     if (error instanceof z.ZodError) {
       res.status(400).json({ error: error.issues });
+      return;
+    }
+    if (error instanceof RequerimientoYaAtendidoError) {
+      res.status(409).json({ error: error.message });
       return;
     }
     console.error('Error despachando requerimiento:', error);
