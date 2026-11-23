@@ -154,6 +154,7 @@ export function canAccessRoute(user: any, route: string): boolean {
         '/salidas/nuevo': 'canCreateSalidas',
         '/kardex': 'canViewReports',
         '/lotes': 'canViewInventory',
+        '/sugerencias': 'canViewReports',
         '/asistente': 'canViewInventory',
         '/usuarios': 'canManageUsers',
         '/requerimientos': 'canViewRequerimientos',

@@ -15,6 +15,7 @@ import areasRouter from './routes/areas.routes';
 import guiasRouter from './routes/guias.routes';
 import consultasRouter from './routes/consultas.routes';
 import dashboardRouter from './routes/dashboard.routes';
+import sugerenciasRouter from './routes/sugerencias.routes';
 
 const app = express();
 
@@ -80,6 +81,7 @@ app.use('/api/areas', areasRouter);
 app.use('/api/guias', guiasRouter);
 app.use('/api/consultas', consultasRouter);
 app.use('/api/dashboard', dashboardRouter);
+app.use('/api/sugerencias', sugerenciasRouter);
 app.use('/api/ia', iaLimiter, iaRouter); // Aplicar limitador estricto para IA
 
 export default app;

@@ -19,6 +19,7 @@ import {
   Archive as PackageCheck,
   Robot as Bot,
   ClipboardText as ClipboardList,
+  Lightbulb,
 } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { useState, useEffect } from "react"
@@ -31,7 +32,7 @@ import {
 import { auth } from "@/lib/supabase"
 import { api } from "@/lib/api"
 import { useUserRole } from "@/hooks/use-user-role"
-import { ROLE_LABELS } from "@/lib/roles"
+import { ROLE_LABELS, hasPermission } from "@/lib/roles"
 import { usePendingRequerimientosCount } from "@/hooks/use-queries"
 
 interface MenuItem {
@@ -91,6 +92,11 @@ const menuItems: MenuItem[] = [
     title: "Lotes",
     href: "/lotes",
     icon: PackageCheck,
+  },
+  {
+    title: "Sugerencias",
+    href: "/sugerencias",
+    icon: Lightbulb,
   },
   {
     title: "Asistente IA",
@@ -229,6 +235,10 @@ export function Sidebar({ onCollapseChange }: SidebarProps) {
             .filter(item => {
               // Ocultar "Usuarios" si no es admin
               if (item.href === '/usuarios' && role !== 'admin') {
+                return false
+              }
+              // Sugerencias de reposición (RF-45): solo con permiso de reportes
+              if (item.href === '/sugerencias' && !hasPermission(user, 'canViewReports')) {
                 return false
               }
               // Si el usuario es solicitante, solo mostrar el módulo de requerimientos

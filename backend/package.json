@@ -8,7 +8,7 @@
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
     "postinstall": "prisma generate",
-    "test": "node --test tests/fefo.test.cjs tests/permissions.test.cjs tests/presence.test.cjs tests/sql-guard.test.cjs tests/despacho.test.cjs"
+    "test": "node --test tests/fefo.test.cjs tests/permissions.test.cjs tests/presence.test.cjs tests/sql-guard.test.cjs tests/despacho.test.cjs tests/pronostico.test.cjs"
   },
   "keywords": [],
   "author": "",
