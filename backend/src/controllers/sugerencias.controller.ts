@@ -10,7 +10,12 @@ let cache: { fin: string; hecho: number; datos: Sugerencias } | null = null;
 // GET /api/sugerencias — pronóstico de 7 días, sugerencias de reposición y lotes en riesgo de vencimiento (RF-45, CU-17)
 export const getSugerencias = async (_req: Request, res: Response): Promise<void> => {
   try {
-    const fin = diaLima(new Date(Date.now() - 86400000));       // último día completo
+    // Último día completo con registros: ayer, o el día anterior al último movimiento si los datos terminan antes
+    // (p. ej., una copia de la base). Un día parcial o sin registrar contaría como demanda 0 y sesgaría el pronóstico.
+    const ultimo = await prisma.movement.findFirst({ orderBy: { fecha: 'desc' }, select: { fecha: true } });
+    const ayer = diaLima(new Date(Date.now() - 86400000));
+    const antesDelUltimo = ultimo ? new Date(Date.parse(diaLima(ultimo.fecha)) - 86400000).toISOString().slice(0, 10) : ayer;
+    const fin = antesDelUltimo < ayer ? antesDelUltimo : ayer;
     if (cache && cache.fin === fin && Date.now() - cache.hecho < 3600000) { res.json(cache.datos); return; }
     const inicioD = new Date(Date.parse(fin) - (VENTANA_DIAS - 1) * 86400000); const inicio = inicioD.toISOString().slice(0, 10);
     const desde = new Date(Date.parse(inicio) - LIMA_MS), hasta = new Date(Date.parse(fin) + 86400000 - LIMA_MS);
