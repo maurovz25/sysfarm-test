@@ -1,7 +1,7 @@
 import unittest
 from datetime import date
 import numpy as np
-from pronostico import serie_diaria, ventanas, ajustar, predecir, reposicion, riesgo_vencimiento, evaluar, ajustar_lad, ajustar_relativo, predecir_relativo, wilcoxon_unilateral
+from pronostico import serie_diaria, ventanas, ajustar, predecir, reposicion, riesgo_vencimiento, evaluar, ajustar_lad, ajustar_relativo, predecir_relativo, wilcoxon_unilateral, ajustar_poisson, predecir_poisson
 
 
 class TestPronostico(unittest.TestCase):
@@ -59,8 +59,17 @@ class TestPronostico(unittest.TestCase):
     def test_evaluar_devuelve_metricas_de_las_tres_politicas(self):
         rng = np.random.default_rng(1); D = rng.poisson(1.0, size=(30, 70)).astype(float)
         m = evaluar(D, np.ones(30), list(range(56, 63)), 28)
-        for k in ('regresion', 'regresion_relativa_robusta', 'ultima_semana', 'promedio_4_semanas'):
+        for k in ('regresion', 'regresion_relativa_robusta', 'regresion_poisson', 'ultima_semana', 'promedio_4_semanas'):
             self.assertIn('MAE', m[k]); self.assertIn('WAPE', m[k])
+
+
+    def test_poisson_recupera_tasa_de_conteos(self):
+        rng = np.random.default_rng(5); n = 4000
+        x2 = rng.uniform(0, 50, n); X = np.c_[np.ones(n), x2, x2, rng.uniform(0, 1, n), rng.integers(0, 2, n)]
+        mu = np.exp(0.2 + 0.9 * np.log1p(x2)); y = rng.poisson(mu).astype(float)
+        p = predecir_poisson(ajustar_poisson(X, y), X)
+        self.assertTrue((p > 0).all())
+        self.assertLess(abs(p.mean() - y.mean()) / y.mean(), 0.05)
 
 
 if __name__ == '__main__':

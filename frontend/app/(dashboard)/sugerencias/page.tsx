@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { formatQuantity } from "@/lib/number-utils"
 
-type Metodo = "regresion" | "regresion_relativa_robusta" | "ultima_semana" | "promedio_4_semanas"
+type Metodo = "regresion" | "regresion_relativa_robusta" | "regresion_poisson" | "ultima_semana" | "promedio_4_semanas"
 interface Sugerencias {
   inicio: string
   fin: string
@@ -18,8 +18,9 @@ interface Sugerencias {
 }
 
 const NOMBRE_METODO: Record<Metodo, string> = {
-  regresion: "Regresión lineal (mínimos cuadrados)",
-  regresion_relativa_robusta: "Regresión lineal robusta ponderada",
+  regresion: "Regresión por mínimos cuadrados",
+  regresion_relativa_robusta: "Regresión por mínimas desviaciones absolutas",
+  regresion_poisson: "Regresión de Poisson",
   ultima_semana: "Última semana",
   promedio_4_semanas: "Promedio de 4 semanas",
 }

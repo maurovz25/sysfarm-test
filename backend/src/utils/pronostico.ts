@@ -3,7 +3,7 @@
 
 export const H = 7;      // horizonte (días)
 export const HIST = 28;  // historia que usan las variables (días)
-export const METODOS = ['regresion', 'regresion_relativa_robusta', 'ultima_semana', 'promedio_4_semanas'] as const;
+export const METODOS = ['regresion', 'regresion_relativa_robusta', 'regresion_poisson', 'ultima_semana', 'promedio_4_semanas'] as const;
 export type Metodo = typeof METODOS[number];
 
 export interface Salida { productId: string; fecha: string; cantidad: number }           // fecha AAAA-MM-DD (Lima)
@@ -73,13 +73,33 @@ export function ajustarRelativo(X: number[][], y: number[]): number[] {
   return ajustarLAD(X.map((x, r) => x.map(v => v / s[r])), y.map((v, r) => v / s[r]));
 }
 
-interface Modelos { regresion: number[]; regresion_relativa_robusta: number[] }
+/** Variables en escala logarítmica para el enlace log de Poisson: [1, log(1+x1), log(1+x2), x3, x4]. */
+const xPoisson = (x: number[]) => [x[0], Math.log1p(x[1]), Math.log1p(x[2]), x[3], x[4]];
+const acotar = (v: number) => Math.min(30, Math.max(-30, v));
+
+/** Regresión de Poisson (enlace log) por mínimos cuadrados reponderados: trata el consumo como un conteo. */
+export function ajustarPoisson(X: number[][], y: number[], iteraciones = 50): number[] {
+  const Z = X.map(xPoisson); const media = y.reduce((a, b) => a + b, 0) / y.length;
+  let b = [Math.log(Math.max(media, 1e-6)), 0, 0, 0, 0];
+  for (let it = 0; it < iteraciones; it++) {
+    const eta = Z.map(z => acotar(dot(b, z))); const mu = eta.map(Math.exp);
+    const zt = eta.map((e, r) => e + (y[r] - mu[r]) / Math.max(mu[r], 1e-9));
+    const nuevo = ajustarMCO(Z, zt, mu);
+    const cambio = Math.max(...nuevo.map((v, i) => Math.abs(v - b[i]))); b = nuevo;
+    if (cambio < 1e-8) break;
+  }
+  return b;
+}
+export const predecirPoisson = (beta: number[], x: number[]) => Math.exp(acotar(dot(beta, xPoisson(x))));
+
+interface Modelos { regresion: number[]; regresion_relativa_robusta: number[]; regresion_poisson: number[] }
 function pronostico(m: Metodo, mod: Modelos, x: number[]): number {
   if (m === 'ultima_semana') return x[1];
   if (m === 'promedio_4_semanas') return x[2];
+  if (m === 'regresion_poisson') return predecirPoisson(mod.regresion_poisson, x);
   return predecir(mod[m], x);
 }
-const ajustar = (X: number[][], y: number[]): Modelos => ({ regresion: ajustarMCO(X, y), regresion_relativa_robusta: ajustarRelativo(X, y) });
+const ajustar = (X: number[][], y: number[]): Modelos => ({ regresion: ajustarMCO(X, y), regresion_relativa_robusta: ajustarRelativo(X, y), regresion_poisson: ajustarPoisson(X, y) });
 
 export interface Metricas { MAE: number; WAPE: number | null; RMSE: number }
 /** Validación con origen móvil: en cada origen de prueba se entrena solo con ventanas cuyo objetivo ya terminó. */

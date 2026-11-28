@@ -76,6 +76,28 @@ def predecir_relativo(beta, X):
     return np.clip((X / s[:, None]) @ beta * s, 0, None)
 
 
+def _x_poisson(X):
+    """Variables en escala logarítmica para el enlace log: constante, log(1+x1), log(1+x2), x3 y x4."""
+    return np.c_[X[:, 0], np.log1p(X[:, 1]), np.log1p(X[:, 2]), X[:, 3], X[:, 4]]
+
+
+def ajustar_poisson(X, y, iteraciones=50):
+    """Regresión de Poisson (enlace log) por mínimos cuadrados reponderados: trata el consumo como un conteo."""
+    Z = _x_poisson(X); b = np.zeros(Z.shape[1]); b[0] = np.log(max(y.mean(), 1e-6))
+    for _ in range(iteraciones):
+        eta = np.clip(Z @ b, -30, 30); mu = np.exp(eta)
+        w = mu; z = eta + (y - mu) / np.maximum(mu, 1e-9)
+        sw = np.sqrt(w)
+        b_nuevo = np.linalg.lstsq(Z * sw[:, None], z * sw, rcond=None)[0]
+        if np.max(np.abs(b_nuevo - b)) < 1e-8: b = b_nuevo; break
+        b = b_nuevo
+    return b
+
+
+def predecir_poisson(beta, X):
+    return np.exp(np.clip(_x_poisson(X) @ beta, -30, 30))
+
+
 def _metricas(e, y):
     return {'MAE': float(np.abs(e).mean()), 'WAPE': float(np.abs(e).sum() / y.sum()) if y.sum() else None,
             'RMSE': float(np.sqrt((e ** 2).mean()))}
@@ -84,7 +106,7 @@ def _metricas(e, y):
 def errores(D, es_med, origenes_prueba, origen_min, entrenar_con=None):
     """Errores (predicción − real) por producto y origen de prueba para los cuatro métodos, y la demanda real.
     entrenar_con: máscara opcional de productos usados para entrenar (validación cruzada por productos)."""
-    E = {'regresion': [], 'regresion_relativa_robusta': [], 'ultima_semana': [], 'promedio_4_semanas': []}; Y = []
+    E = {'regresion': [], 'regresion_relativa_robusta': [], 'regresion_poisson': [], 'ultima_semana': [], 'promedio_4_semanas': []}; Y = []
     for t in origenes_prueba:
         entren = list(range(origen_min, t - H + 1))
         X, y, p = ventanas(D, entren, es_med)
@@ -92,6 +114,7 @@ def errores(D, es_med, origenes_prueba, origen_min, entrenar_con=None):
         Xt, yt, _ = ventanas(D, [t], es_med)
         E['regresion'].append(predecir(ajustar(X, y), Xt) - yt)
         E['regresion_relativa_robusta'].append(predecir_relativo(ajustar_relativo(X, y), Xt) - yt)
+        E['regresion_poisson'].append(predecir_poisson(ajustar_poisson(X, y), Xt) - yt)
         E['ultima_semana'].append(Xt[:, 1] - yt)
         E['promedio_4_semanas'].append(Xt[:, 2] - yt)
         Y.append(yt)

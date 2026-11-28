@@ -6,7 +6,7 @@ Escribe en ml/out/: resultados.json, sugerencias_reposicion.csv, riesgo_vencimie
 import csv, json, sys, os
 from datetime import date, timedelta
 import numpy as np
-from pronostico import cargar_salidas, serie_diaria, ventanas, ajustar, predecir, evaluar, reposicion, riesgo_vencimiento, ajustar_relativo, predecir_relativo, HIST, H
+from pronostico import cargar_salidas, serie_diaria, ventanas, ajustar, predecir, evaluar, reposicion, riesgo_vencimiento, ajustar_relativo, predecir_relativo, ajustar_poisson, predecir_poisson, HIST, H
 
 RAW = sys.argv[1]
 NOMBRES = sys.argv[2] if len(sys.argv) > 2 else None
@@ -45,6 +45,7 @@ col = {'ultima_semana': 1, 'promedio_4_semanas': 2}
 beta_rel = ajustar_relativo(X, y)
 if elegido == 'regresion': pred, res = predecir(beta, Xf), res_reg
 elif elegido == 'regresion_relativa_robusta': pred, res = predecir_relativo(beta_rel, Xf), y - predecir_relativo(beta_rel, X)
+elif elegido == 'regresion_poisson': beta_poi = ajustar_poisson(X, y); pred, res = predecir_poisson(beta_poi, Xf), y - predecir_poisson(beta_poi, X)
 else: pred, res = Xf[:, col[elegido]], y - X[:, col[elegido]]
 sig_global = float(np.sqrt((res ** 2).mean()))
 sigma = np.array([float(np.sqrt((res[pidx == i] ** 2).mean())) for i in range(len(productos))])
